@@ -8,14 +8,12 @@
 *{margin:0;padding:0}
 body,html{width:100%;height:100%;overflow:hidden;background:#000}
 #map{width:100%;height:100%}
-#bar{position:absolute;top:env(safe-area-inset-top,8px);left:8px;right:8px;z-index:1;display:flex;gap:4px;flex-wrap:wrap}
-#bar select,#bar input,#bar button{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.8);color:#fff;font-size:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#bar button{cursor:pointer;font-weight:bold;min-width:44px}
-#bar button:hover{background:rgba(255,255,255,.15)}
-#bar input{font-family:monospace;font-size:11px;flex:1;min-width:140px}
-#st{font-size:12px;padding:5px 8px;border-radius:6px;background:rgba(0,0,0,.8);white-space:nowrap}
-.pxy{font-size:10px;padding:3px 6px;border-radius:4px;background:rgba(255,255,255,.08);color:#8b949e;cursor:pointer;border:none}
-.pxy.on{background:#3fb950;color:#000}
+#bar{position:absolute;top:env(safe-area-inset-top,10px);left:8px;right:8px;z-index:1;display:flex;gap:4px;flex-wrap:wrap}
+#bar select,#bar input,#bar button{padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.82);color:#fff;font-size:14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#bar button{cursor:pointer;font-weight:bold;min-width:48px}
+#bar button:active{background:rgba(255,255,255,.2)}
+#bar input{font-family:monospace;font-size:11px;flex:1;min-width:120px}
+#st{font-size:12px;padding:6px 10px;border-radius:8px;background:rgba(0,0,0,.82);white-space:nowrap}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.2.1/ol.css">
 </head>
@@ -23,95 +21,92 @@ body,html{width:100%;height:100%;overflow:hidden;background:#000}
 
 <div id="bar">
   <select id="ly">
-    <option value="bufr_phenomena">Опасные явления</option>
-    <option value="bufr_dbz1">Отражаемость 1км</option>
+    <option value="bufr_phenomena">Явления</option>
+    <option value="bufr_dbz1">dBZ 1км</option>
     <option value="bufr_height">Высота ВГО</option>
-    <option value="bufr_zdr1">Дифф отраж 1км</option>
-    <option value="bufr_vel1">Доплер 1км</option>
+    <option value="bufr_zdr1">ZDR</option>
+    <option value="bufr_vel1">Доплер</option>
     <option value="bufr_precip">Осадки</option>
     <option value="bufr_summ12">Сумма 12ч</option>
     <option value="nowcast">Наукастинг</option>
     <option value="fmi_open_composite_dbz">FMI dBZ</option>
   </select>
-  <input id="tk" placeholder="токен (подхватится сам)">
-  <button id="go">✔</button>
-  <button id="pxy" class="pxy">прокси</button>
-  <span id="st">загрузка...</span>
+  <input id="tk" placeholder="токен..." style="display:none">
+  <button id="go" style="display:none">✔</button>
+  <span id="st">⏳</span>
 </div>
 
 <div id="map"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/ol@v10.2.1/dist/ol.js"></script>
 <script>
-var token='', layer=document.getElementById('ly').value, useProxy=false;
-var W='https://www.nowcast.ru/baltrad_wsgi';
-var GW=function(){return useProxy?'http://localhost:8015/baltrad_wsgi':W};
-var GT=function(){return useProxy?'http://localhost:8015/get_token':'https://www.nowcast.ru/get_token'};
+// ===== КОНФИГ =====
+var TOKEN_URL = 'https://www.nowcast.ru/get_token';
+var WMS_URL   = 'https://www.nowcast.ru/baltrad_wsgi';
+var PROXY     = 'http://localhost:8015';       // только для dev-компьютера
 
-function S(t,c){document.getElementById('st').textContent=t;document.getElementById('st').style.color=c||'#3fb950'}
-function px(t){document.getElementById('pxy').textContent=t?'прокси ✓':'прокси';document.getElementById('pxy').className=t?'pxy on':'pxy'}
+// ===== СОСТОЯНИЕ =====
+var token='', layer=document.getElementById('ly').value;
+var stEl=document.getElementById('st'), tkEl=document.getElementById('tk'), goEl=document.getElementById('go');
+
+function S(t,c){stEl.textContent=t;stEl.style.color=c||'#3fb950'}
 
 function apply(t){
-  token=t; document.getElementById('tk').value=t; src.changed();
-  try{var j=JSON.parse(atob(t.split('.')[1]));S('✅ до '+new Date(j.exp*1000).toLocaleTimeString('ru-RU'),'#3fb950')}
+  token=t; tkEl.value=t; src.changed();
+  try{var j=JSON.parse(atob(t.split('.')[1]));S('⏰ '+new Date(j.exp*1000).toLocaleTimeString('ru-RU'),'#3fb950')}
   catch(e){S('✅','#3fb950')}
 }
 
-// WMS
+// ===== WMS =====
 var src=new ol.source.ImageWMS({
-  url:W, params:{LAYERS:layer,FORMAT:'image/png',TRANSPARENT:'true'}, ratio:1,
+  url:WMS_URL, params:{LAYERS:layer,FORMAT:'image/png',TRANSPARENT:'true'}, ratio:1,
   imageLoadFunction:function(img,s){img.getImage().src=s+(token?'&token='+token:'')}
 });
 var wms=new ol.layer.Image({opacity:.65,source:src});
 
-// Карта
 new ol.Map({
   layers:[new ol.layer.Tile({source:new ol.source.OSM()}),wms],
   target:'map',
   view:new ol.View({center:ol.proj.fromLonLat([37.4,55.6]),zoom:6})
 }).addControl(new ol.control.ZoomSlider());
 
-// ===== ТОКЕН: прямой → прокси → localStorage =====
-function tryDirect(){
-  var u=GT(); S('запрос токена...','#888');
+// ===== ТОКЕН: 3 уровня + детект окружения =====
+function isDev(){return location.hostname==='localhost'||location.hostname==='127.0.0.1'||location.protocol==='file:'}
+
+// Уровень 1: прямой fetch (работает в WebView приложения!)
+function step1(){
+  S('⏳ запрос...','#888');
+  fetch(TOKEN_URL).then(function(r){return r.json()}).then(function(d){
+    if(d.token){apply(d.token);S('✅','#3fb950');hideInput()}else step2();
+  }).catch(function(){step2()});
+}
+
+// Уровень 2: прокси (только dev-компьютер)
+function step2(){
+  if(!isDev()){step3();return}  // на телефоне пропускаем
+  var u=PROXY+'/get_token';
   fetch(u).then(function(r){return r.json()}).then(function(d){
-    if(d.token){apply(d.token);S('✅ авто','#3fb950')}else throw new Error('no token')
-  }).catch(function(e){
-    S('⚠ прямо не сработал','#d2991d');
-    if(!useProxy) tryProxy(); else fallback();
-  });
+    if(d.token){apply(d.token);S('✅ proxy','#3fb950');hideInput()}else step3();
+  }).catch(function(){step3()});
 }
 
-function tryProxy(){
-  useProxy=true; px(true);
-  S('пробую прокси...','#d2991d');
-  fetch(GT()).then(function(r){return r.json()}).then(function(d){
-    if(d.token){apply(d.token);S('✅ через прокси','#3fb950')}else throw new Error('no token')
-  }).catch(function(){
-    S('⚠ прокси тоже нет','#d2991d'); useProxy=false; px(false); fallback();
-  });
+// Уровень 3: localStorage / ручной ввод
+function step3(){
+  var saved=localStorage.getItem('t');
+  if(saved){apply(saved);S('📦','#3fb950');showInput()}else{showInput();S('🔑 введите токен','#d2991d')}
 }
 
-function fallback(){
-  var s=localStorage.getItem('t');
-  if(s){apply(s);S('📦 из памяти','#3fb950')}else S('⚠ вставьте токен','#d2991d');
-}
-
-tryDirect();
+function hideInput(){tkEl.style.display='none';goEl.style.display='none'}
+function showInput(){tkEl.style.display='';goEl.style.display=''}
 
 // ===== КНОПКИ =====
-document.getElementById('go').onclick=function(){
-  var t=document.getElementById('tk').value.trim(); if(!t)return;
-  localStorage.setItem('t',t); apply(t);
+goEl.onclick=function(){
+  var t=tkEl.value.trim();if(!t)return;localStorage.setItem('t',t);apply(t);hideInput();
 };
+document.getElementById('ly').onchange=function(){layer=this.value;src.updateParams({LAYERS:layer})};
 
-document.getElementById('ly').onchange=function(){
-  layer=this.value; src.updateParams({LAYERS:layer});
-};
-
-document.getElementById('pxy').onclick=function(){
-  if(useProxy){useProxy=false;px(false);S('прямой nowcast.ru','');tryDirect()}else tryProxy();
-};
+// ===== СТАРТ =====
+step1();
 </script>
 </body>
 </html>
