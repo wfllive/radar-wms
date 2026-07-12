@@ -1,83 +1,67 @@
-# Релиз (Production) — как это работает
+# DEV ⇄ RELEASE
 
-## 3 способа запуска
+## Одна команда (всегда)
 
-| Способ | Команда | Прокси | Токен |
-|--------|---------|--------|-------|
-| **Dev** | `npm start` | ✅ proxy.js на :8015 | авто через прокси |
-| **Dev web** | `npm run web` | ✅ proxy.js отдельно | авто через прокси |
-| **Релиз APK** | `eas build` | ❌ нет | авто через WebView |
+```bash
+npm start        # proxy :8015 + expo (QR код)
+npm run web      # proxy :8015 + expo --web
+npm run android  # proxy :8015 + expo --android
+npm run ios      # proxy :8015 + expo --ios
+```
+
+**Прокси и Expo запускаются вместе.** Не нужно два терминала.
 
 ---
 
-## Релиз (APK / IPA) — прокси НЕ нужен
+## Dev (компьютер)
 
-В собранном `.apk`/`.ipa` файле:
+```
+Браузер / Expo Web
+  │
+  ├─ fetch(localhost:8015/get_token) → токен (прокси обходит CORS)
+  ├─ <img src=nowcast.ru/...>        → радар (CORS не нужен)
+  │
+  └─ Прокси :8015 делает запросы с Referer: nowcast.ru
+```
+
+Нужен **только для dev** — в браузере CORS блокирует `fetch(get_token)`.
+
+---
+
+## Release (APK на телефоне)
 
 ```
 Приложение (APK)
   └─ WebView
-       └─ map.html (из бандла)
-            ├─ fetch(nowcast.ru/get_token)  ← ПРЯМО, без прокси
-            └─ <img src=nowcast.ru/baltrad_wsgi?...>  ← ПРЯМО
+       ├─ fetch(nowcast.ru/get_token) → ✅ работает (WebView ≠ браузер)
+       └─ <img src=nowcast.ru/...>    → ✅ всегда
 ```
 
-**Почему работает без прокси:**
-- `<img>` теги грузят картинки БЕЗ CORS — всегда
-- `fetch()` в WebView на мобильном устройстве — CORS либо отсутствует, либо мы передаём `allowUniversalAccessFromFileURLs`
-- WebView — это не браузер, политики CORS там мягче
-- Если fetch всё же заблокирован → fallback на ручной токен (сохраняется в localStorage)
+**Прокси НЕ НУЖЕН.** WebView на телефоне не блокирует кросс-доменные запросы.
 
-**Цепочка получения токена в релизе:**
-```
-1. fetch(https://www.nowcast.ru/get_token) → ✅ работает в WebView
-2. localStorage резерв
-```
+Если авто-токен не сработал → экран ввода токена. Вставил один раз — сохранился навсегда.
 
 ---
 
-## Сборка релиза
+## Сборка APK
 
 ```bash
 cd radar-wms/mobile
 npm install
-npx eas build --platform android   # APK
-npx eas build --platform ios       # IPA (нужен Mac)
-```
-
-Или для предпросмотра:
-```bash
-npx expo run:android   # локальная сборка на эмуляторе
-npx expo run:ios       # локальная сборка на симуляторе
+npx expo run:android          # локальная сборка
+npx eas build --platform android  # APK для установки
 ```
 
 ---
 
-## Dev-режим (с прокси)
-
-```bash
-cd radar-wms/mobile
-npm start                # proxy + expo вместе
-```
-
-Или отдельно:
-```bash
-npm run proxy            # только прокси :8015
-npm run web              # только expo web
-```
-
-Прокси открывает http://localhost:8015 — там index-страница со ссылками.
-
----
-
-## Структура
+## Как работает map.html (без сервера)
 
 ```
-mobile/
-├── App.js          ← WebView с map.html
-├── assets/map.html ← карта (OSM + WMS + авто-токен)
-├── proxy.js        ← dev-прокси (CORS + токен + раздача статики)
-├── start.js        ← запуск proxy + expo вместе
-├── app.json        ← конфиг Expo
-└── package.json
+1. Пытается fetch(nowcast.ru/get_token)   ← авто
+2. Если не вышло → localStorage           ← сохранённый
+3. Если нет → экран ввода токена          ← ручной
 ```
+
+WMS-картинки всегда через `<img>` — без fetch, без CORS, без прокси.
+
+Прокси (`proxy.js`) — опция, только для удобства в dev-браузере.

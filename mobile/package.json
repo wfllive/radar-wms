@@ -11,10 +11,10 @@
   },
   "scripts": {
     "start": "node start.js",
-    "proxy": "node proxy.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "node start.js web",
+    "android": "node start.js android",
+    "ios": "node start.js ios",
+    "proxy": "node proxy.js"
   },
   "private": true
 }
