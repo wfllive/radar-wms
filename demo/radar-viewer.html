@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Радарная карта — WMS Viewer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.2.1/ol.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#1a1a2e;color:#eee;overflow:hidden}
+#toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;background:#16213e;border-bottom:2px solid #0f3460;align-items:center;font-size:13px}
+#toolbar select,#toolbar button,#toolbar input{padding:5px 8px;border-radius:4px;border:1px solid #0f3460;background:#1a1a2e;color:#eee;font-size:13px;cursor:pointer}
+#toolbar button:hover{background:#0f3460}
+#toolbar select{min-width:140px}
+#container{display:flex;height:calc(100vh - 55px)}
+#map{flex:1;min-height:0;background:#000}
+#sidebar{width:280px;background:#16213e;padding:10px;overflow-y:auto;border-left:2px solid #0f3460;font-size:12px}
+#sidebar h3{font-size:13px;margin:8px 0 4px;color:#e94560}
+#sidebar img{max-width:100%;border-radius:4px}
+#log{width:100%;height:320px;background:#0d1117;color:#8b949e;font-family:monospace;font-size:11px;padding:6px;border-radius:4px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:6px;border:1px solid #0f3460}
+#log .err{color:#f85149}
+#log .ok{color:#3fb950}
+#log .warn{color:#d2991d}
+#log .info{color:#58a6ff}
+a{color:#e94560}
+iframe{width:100%;height:120px;border:1px solid #0f3460;border-radius:4px;margin-top:4px;background:#fff}
+.token-row{display:flex;align-items:center;gap:4px}
+.token-row input{font-family:monospace;font-size:11px!important;width:180px}
+.token-status{display:inline-block;width:10px;height:10px;border-radius:50%;margin-left:4px}
+.token-ok{background:#3fb950}.token-err{background:#f85149}.token-warn{background:#d2991d}
+.mode-on{background:#3fb950!important;color:#000!important;border-color:#3fb950!important}
+.mode-off{background:#1a1a2e!important}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <select id="layerSelect">
+    <optgroup label="BUFR основной"><option value="bufr_phenomena" selected>Опасные явления</option><option value="bufr_dbz1">Отражаемость 1км</option><option value="bufr_height">Высота ВГО</option><option value="bufr_zdr1">Дифф.отражаемость 1км</option><option value="bufr_vel1">Доплер 1км</option><option value="bufr_vel2">Доплер 2км</option><option value="bufr_vel3">Доплер 3км</option><option value="bufr_vel4">Доплер 4км</option><option value="bufr_precip">Осадки</option><option value="bufr_summ12">Сумма 12ч</option></optgroup>
+    <optgroup label="BUFR Новосибирск"><option value="bufr_novosib_phenomena">Опасные явления</option><option value="bufr_novosib_dbz1">Отражаемость 1км</option><option value="bufr_novosib_precip">Осадки</option><option value="bufr_novosib_vel1">Доплер 1км</option></optgroup>
+    <optgroup label="BUFR Владивосток"><option value="bufr_vlad_phenomena">Опасные явления</option><option value="bufr_vlad_dbz1">Отражаемость 1км</option><option value="bufr_vlad_precip">Осадки</option><option value="bufr_vlad_vel1">Доплер 1км</option></optgroup>
+    <optgroup label="FMI Open"><option value="fmi_open_composite_dbz">FMI dBZ</option><option value="fmi_open_composite_rr">FMI mm/h</option></optgroup>
+    <option value="nowcast">Наукастинг</option>
+  </select>
+
+  <button id="btnPrev">◀</button>
+  <select id="timeSelect"><option value="-1">последнее</option></select>
+  <button id="btnNext">▶</button>
+  <button id="btnPlay">▶ Аним</button>
+  <button id="btnStop" style="display:none">⏹ Стоп</button>
+
+  <button id="btnMode" class="mode-on" title="Режим: proxy/localhost">🟢 ПРОКСИ</button>
+
+  <span class="token-row" style="margin-left:4px">
+    <label style="font-size:11px">token:</label>
+    <input id="tokenInput" placeholder="авто..." style="padding:4px 6px;border-radius:4px;border:1px solid #0f3460;background:#1a1a2e;color:#eee">
+    <span id="tokenDot" class="token-status token-warn" title="статус токена"></span>
+  </span>
+
+  <button id="btnApply">🔄 Обновить</button>
+  <span id="status" style="opacity:0.7;font-size:11px;margin-left:4px"></span>
+</div>
+
+<div id="container">
+  <div id="map"></div>
+  <div id="sidebar">
+    <h3>Режим</h3>
+    <div style="font-size:11px;margin-bottom:8px">
+      <div id="modeInfo">прокси localhost:8015</div>
+      <div style="margin-top:2px">WMS: <span id="wmsInfo" style="color:#58a6ff">—</span></div>
+    </div>
+    <h3>Токен</h3>
+    <div id="tokenInfo" style="font-size:11px;margin-bottom:8px">
+      <div>Источник: <span id="tokenSrc">—</span></div>
+      <div>Истекает: <span id="tokenExp">—</span></div>
+      <div>IP в токене: <span id="tokenIp">—</span></div>
+    </div>
+    <h3>Легенда</h3>
+    <img id="legendImg" src="" alt="легенда" style="display:none">
+    <div id="legendMsg" style="opacity:0.5">ожидание данных...</div>
+    <h3>Инфо точки</h3>
+    <iframe id="infoFrame" style="display:none"></iframe>
+    <div id="featureInfo">кликните на карту</div>
+    <h3>Диагностика</h3>
+    <button id="btnClearLog" style="font-size:11px;padding:2px 8px;margin-bottom:4px;background:#0f3460;border:none;color:#eee;border-radius:3px;cursor:pointer">очистить</button>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/ol@v10.2.1/dist/ol.js"></script>
+<script>
+(function(){
+var map, wmsLayer, animationId=null, timestamps=[], legendUrl='';
+var currentLayer=document.getElementById('layerSelect').value, currentTime='-1';
+var currentToken='', tokenRefreshTimer=null, tokenFrom='';
+var proxyMode=true; // ← по умолчанию прокси
+
+function L(msg,cls){ var d=document.getElementById('log'),t=new Date().toLocaleTimeString();d.innerHTML+='<span class=\"'+cls+'\">'+t+'  '+msg+'</span>\n';d.scrollTop=d.scrollHeight; }
+
+// ===== URL-ы в зависимости от режима =====
+function wmsBase(){ return proxyMode?'http://localhost:8015/baltrad_wsgi':'https://www.nowcast.ru/baltrad_wsgi'; }
+function tokenUrl(){ return proxyMode?'http://localhost:8015/get_token':'https://www.nowcast.ru/get_token'; }
+
+// ===== JWT =====
+function decodeJWT(token){
+  try{
+    var parts=token.split('.'); if(parts.length!==3) return null;
+    var s=parts[1].replace(/-/g,'+').replace(/_/g,'/');
+    while(s.length%4) s+='=';
+    return JSON.parse(decodeURIComponent(escape(atob(s))));
+  }catch(e){return null;}
+}
+function formatDuration(s){if(s<=0)return '0с';var m=Math.floor(s/60),h=Math.floor(m/60),d=Math.floor(h/24);if(d)return d+'д '+(h%24)+'ч';if(h)return h+'ч '+(m%60)+'м';if(m)return m+'м '+(s%60)+'с';return s+'с';}
+
+// ===== UI ТОКЕНА =====
+function updateTokenUI(){
+  var dot=document.getElementById('tokenDot'), src=document.getElementById('tokenSrc');
+  var expEl=document.getElementById('tokenExp'), ipEl=document.getElementById('tokenIp');
+  if(!currentToken){
+    dot.className='token-status token-err'; src.textContent='НЕТ';
+    expEl.textContent='—'; ipEl.textContent='—';
+    document.getElementById('status').textContent='[Нет токена]'; return;
+  }
+  src.textContent=tokenFrom;
+  var jwt=decodeJWT(currentToken);
+  if(!jwt){dot.className='token-status token-warn';expEl.textContent='не JWT';ipEl.textContent='—';return;}
+  var exp=new Date(jwt.exp*1000), diff=Math.floor((exp-now())/1000);
+  expEl.textContent=exp.toLocaleString('ru-RU')+' ('+(diff>0?formatDuration(diff)+' ост.':'ИСТЁК')+')';
+  ipEl.textContent=jwt.ip||'неизв.';
+  dot.className='token-status '+(diff<=0?'token-err':diff<300?'token-warn':'token-ok');
+  document.getElementById('status').textContent='['+(diff>0?'токен '+formatDuration(diff):'ТОКЕН ИСТЁК!')+']';
+}
+function now(){return new Date();}
+
+// ===== ТОКЕН: авто-запрос =====
+async function autoFetchToken(){
+  var tu=tokenUrl();
+  L('🔑 Запрос токена: '+tu,'');
+  try{
+    var r=await fetch(tu);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    var data=await r.json();
+    if(!data.token) throw new Error('нет поля token');
+    currentToken=data.token;
+    tokenFrom=proxyMode?'прокси /get_token':'прямой nowcast.ru';
+    L('  ✅ Токен получен! Истекает: '+new Date(decodeJWT(currentToken).exp*1000).toLocaleString('ru-RU'),'ok');
+    document.getElementById('tokenInput').value='(авто)';
+    updateTokenUI();
+  }catch(e){
+    L('  ❌ '+e.message,'err');
+    if(!proxyMode && e.message.indexOf('Failed to fetch')>=0)
+      L('  → CORS блокирует. Включите ПРОКСИ или вставьте токен вручную.','warn');
+    else if(proxyMode)
+      L('  → Прокси не запущен? Запусти: node proxy-nowcast.js','warn');
+    fallbackManual();
+  }
+}
+
+function fallbackManual(){
+  tokenFrom='ручной';
+  var saved=localStorage.getItem('wms_token');
+  if(saved && !currentToken){
+    currentToken=saved; document.getElementById('tokenInput').value=currentToken;
+    L('📦 Токен из localStorage','info');
+  }
+  updateTokenUI();
+}
+
+function startRefresh(){
+  stopRefresh();
+  autoFetchToken().then(function(){
+    tokenRefreshTimer=setInterval(autoFetchToken,30000);
+  });
+}
+function stopRefresh(){if(tokenRefreshTimer){clearInterval(tokenRefreshTimer);tokenRefreshTimer=null;}}
+
+// ===== ВПРЫСК ТОКЕНА =====
+function imgLoadFn(image, src){
+  if(!currentToken){image.getImage().src=src;return;}
+  var sep=src.indexOf('?')>=0?'&':'?';
+  image.getImage().src=src+sep+'token='+encodeURIComponent(currentToken);
+}
+
+// ===== РЕЖИМ: ПРОКСИ / ПРЯМОЙ =====
+function toggleMode(){
+  proxyMode=!proxyMode;
+  var btn=document.getElementById('btnMode');
+  btn.textContent=proxyMode?'🟢 ПРОКСИ':'🔴 ПРЯМО';
+  btn.className=proxyMode?'mode-on':'mode-off';
+  document.getElementById('modeInfo').textContent=proxyMode?'прокси localhost:8015':'прямой nowcast.ru';
+  document.getElementById('wmsInfo').textContent=wmsBase();
+  L('🔄 Режим: '+(proxyMode?'ПРОКСИ (localhost:8015)':'ПРЯМО (nowcast.ru)'),'info');
+  if(proxyMode&&!currentToken) startRefresh();
+  reconnect();
+}
+function reconnect(){
+  var src=new ol.source.ImageWMS({url:wmsBase(),params:{LAYERS:currentLayer,FORMAT:'image/png',TRANSPARENT:'true'},ratio:1,serverType:'mapserver',imageLoadFunction:imgLoadFn});
+  src.on('imageloaderror',function(){L('❌ WMS не загрузился','err');});
+  src.on('imageloadend',function(){L('  ✅ WMS ок','ok');});
+  wmsLayer.setSource(src);
+  loadCaps();
+}
+
+// ===== ИНИТ =====
+function init(){
+  L('▶ Старт. Режим: ПРОКСИ','ok');
+  L('   WMS: '+wmsBase(),'info');
+  L('   Token: '+tokenUrl(),'info');
+  L('   Прокси даёт CORS + Referer. Запуск: node proxy-nowcast.js','info');
+  document.getElementById('wmsInfo').textContent=wmsBase();
+  document.getElementById('modeInfo').textContent='прокси localhost:8015';
+
+  var src=new ol.source.ImageWMS({url:wmsBase(),params:{LAYERS:currentLayer,FORMAT:'image/png',TRANSPARENT:'true'},ratio:1,serverType:'mapserver',imageLoadFunction:imgLoadFn});
+  src.on('imageloaderror',function(){L('❌ WMS не загрузился','err');});
+  src.on('imageloadend',function(){L('  ✅ WMS ок','ok');});
+  wmsLayer=new ol.layer.Image({opacity:0.7,source:src});
+
+  map=new ol.Map({layers:[new ol.layer.Tile({source:new ol.source.OSM({url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png'})}),wmsLayer],target:'map',view:new ol.View({center:ol.proj.fromLonLat([37.4,55.6]),zoom:6})});
+  map.addControl(new ol.control.ZoomSlider());map.addControl(new ol.control.ScaleLine());map.on('click',handleMapClick);
+
+  document.getElementById('layerSelect').addEventListener('change',function(){currentLayer=document.getElementById('layerSelect').value;loadCaps();});
+  document.getElementById('timeSelect').addEventListener('change',function(){currentTime=document.getElementById('timeSelect').value;});
+  document.getElementById('btnPrev').addEventListener('click',function(){stepTime(-1)});
+  document.getElementById('btnNext').addEventListener('click',function(){stepTime(1)});
+  document.getElementById('btnPlay').addEventListener('click',startAnim);
+  document.getElementById('btnStop').addEventListener('click',stopAnim);
+  document.getElementById('btnMode').addEventListener('click',toggleMode);
+  document.getElementById('btnApply').addEventListener('click',function(){
+    var t=document.getElementById('tokenInput').value.trim();
+    if(!t||t==='(авто)'){startRefresh();return;}
+    currentToken=t;tokenFrom='ручной';localStorage.setItem('wms_token',t);
+    L('🔑 Токен вручную','info');updateTokenUI();reconnect();
+  });
+  document.getElementById('btnClearLog').addEventListener('click',function(){document.getElementById('log').innerHTML=''});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft')stepTime(-1);if(e.key==='ArrowRight')stepTime(1);
+    if(e.key===' '){e.preventDefault();animationId?stopAnim():startAnim();}
+  });
+
+  startRefresh();loadCaps();
+}
+
+// ===== GETCAPABILITIES =====
+function loadCaps(){
+  var url=wmsBase()+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities';
+  if(currentToken) url+='&token='+encodeURIComponent(currentToken);
+  L('📡 GetCapabilities','');
+  fetch(url).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  }).then(function(xml){
+    var doc=(new DOMParser()).parseFromString(xml,'text/xml');
+    var se=doc.querySelector('ServiceException');if(se){L('❌ '+se.textContent.trim(),'err');return;}
+    var layers=doc.querySelectorAll('Layer>Layer'),found=false;
+    layers.forEach(function(lyr){
+      var n=lyr.querySelector('Name');if(!n)return;
+      if(n.textContent.split(',')[0]===currentLayer.split(',')[0]){
+        found=true;var ext=lyr.querySelector('Extent');
+        if(ext){timestamps=ext.textContent.split(',');fillTimes(timestamps);L('   '+timestamps.length+' таймстемпов','ok');}
+        var sl=lyr.querySelector('Style');if(sl){var olr=sl.querySelector('OnlineResource');if(olr){var href=olr.getAttribute('xlink:href')||olr.getAttribute('href');if(href){legendUrl=href;var img=document.getElementById('legendImg');img.src=href;img.style.display='block';document.getElementById('legendMsg').style.display='none';}}}
+      }
+    });
+    document.getElementById('status').textContent='['+(found?'OK ('+timestamps.length+')':'не найден')+']';
+  }).catch(function(e){L('⚠ GetCapabilities: '+e.message,'warn');L('  Карта работает и без GetCapabilities','info');});
+}
+function fillTimes(ts){var s=document.getElementById('timeSelect');s.innerHTML='<option value=\"-1\">последнее</option>';ts.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;s.appendChild(o)});}
+
+function stepTime(d){var s=document.getElementById('timeSelect'),i=s.selectedIndex+d;if(i>=0&&i<s.options.length){s.selectedIndex=i;currentTime=s.value;}}
+function startAnim(){if(!timestamps.length){L('Нет таймстемпов','warn');return;}document.getElementById('btnPlay').style.display='none';document.getElementById('btnStop').style.display='inline';var s=document.getElementById('timeSelect');if(s.selectedIndex<1)s.selectedIndex=1;animationId=setInterval(function(){s.selectedIndex=s.selectedIndex>=s.options.length-1?1:s.selectedIndex+1;currentTime=s.value;},800);}
+function stopAnim(){document.getElementById('btnPlay').style.display='inline';document.getElementById('btnStop').style.display='none';if(animationId){clearInterval(animationId);animationId=null;}}
+function handleMapClick(evt){
+  var url=wmsLayer.getSource().getFeatureInfoUrl(evt.coordinate,map.getView().getResolution(),map.getView().getProjection(),{INFO_FORMAT:'text/html'});
+  if(url&&currentToken){url+=(url.indexOf('?')>=0?'&':'?')+'token='+encodeURIComponent(currentToken);var f=document.getElementById('infoFrame');f.style.display='block';f.src=url;document.getElementById('featureInfo').style.display='none';}
+}
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+</body>
+</html>

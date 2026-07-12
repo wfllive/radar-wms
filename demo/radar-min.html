@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>nowcast.ru — радар (без JavaScript)</title>
+<style>
+body{background:#1a1a2e;color:#eee;font-family:sans-serif;margin:20px;line-height:1.5}
+h1{font-size:22px;margin-bottom:4px}
+h2{font-size:16px;margin:24px 0 8px;color:#e94560}
+.sub{font-size:12px;opacity:.6;margin-bottom:16px}
+.tile{display:inline-block;margin:6px;vertical-align:top}
+.tile a{text-decoration:none}
+.tile img{border-radius:6px;border:2px solid #2a2a4a;width:256px;height:256px}
+.tile img:hover{border-color:#e94560}
+.tile div{font-size:11px;text-align:center;margin-top:3px;opacity:.5}
+a{color:#58a6ff}
+hr{border-color:#2a2a4a;margin:20px 0}
+.foot{font-size:11px;opacity:.4;margin-top:40px}
+</style>
+</head>
+<body>
+
+<h1>Радарная карта nowcast.ru</h1>
+<p class="sub">⚠ Этот файл содержит <b>ноль JavaScript</b>. Только &lt;img&gt; и &lt;a&gt;.<br>
+Токен автоматически впрыскивается прокси-сервером. Запустите: <code>node proxy-nowcast.js</code></p>
+
+<!-- ===== ТАЙЛЫ С РАДАРОМ ===== -->
+<h2>🗺 Опасные явления (bufr_phenomena)</h2>
+
+<div class="tile">
+  <a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=20,45,35,58&WIDTH=600&HEIGHT=600&TRANSPARENT=true">
+    <img src="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=20,45,35,58&WIDTH=256&HEIGHT=256&TRANSPARENT=true" alt="запад" loading="lazy">
+  </a>
+  <div>запад (клик — крупнее)</div>
+</div>
+
+<div class="tile">
+  <a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=34,51,41,58&WIDTH=600&HEIGHT=600&TRANSPARENT=true">
+    <img src="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=34,51,41,58&WIDTH=256&HEIGHT=256&TRANSPARENT=true" alt="москва" loading="lazy">
+  </a>
+  <div>Москва и область</div>
+</div>
+
+<div class="tile">
+  <a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=42,48,57,61&WIDTH=600&HEIGHT=600&TRANSPARENT=true">
+    <img src="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=42,48,57,61&WIDTH=256&HEIGHT=256&TRANSPARENT=true" alt="восток" loading="lazy">
+  </a>
+  <div>восток</div>
+</div>
+
+<!-- ===== ЛЕГЕНДА ===== -->
+<h2>🎨 Легенда</h2>
+<img src="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetLegendGraphic&LAYER=bufr_phenomena&FORMAT=image/png" alt="легенда" style="background:#fff;padding:6px;border-radius:4px">
+
+<!-- ===== ВСЕ СЛОИ ===== -->
+<h2>📡 Все слои (прямые ссылки)</h2>
+<ul style="font-size:13px;columns:2">
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Опасные явления</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_dbz1&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Отражаемость 1км</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_height&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Высота ВГО</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_zdr1&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Дифф. отражаемость</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_vel1&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Доплер 1км</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_vel2&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Доплер 2км</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_vel3&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Доплер 3км</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_vel4&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Доплер 4км</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_precip&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Осадки</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_summ12&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Сумма 12ч</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=nowcast&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Наукастинг</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=fmi_open_composite_dbz&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">FMI dBZ</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=fmi_open_composite_rr&FORMAT=image/png&SRS=EPSG:4326&BBOX=25,45,50,65&WIDTH=800&HEIGHT=600&TRANSPARENT=true">FMI mm/h</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_novosib_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=70,50,90,62&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Новосибирск — явления</a></li>
+<li><a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=bufr_vlad_phenomena&FORMAT=image/png&SRS=EPSG:4326&BBOX=125,40,145,55&WIDTH=800&HEIGHT=600&TRANSPARENT=true">Владивосток — явления</a></li>
+</ul>
+
+<h2>📋 GetCapabilities (XML)</h2>
+<a href="http://localhost:8015/baltrad_wsgi?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities">открыть XML со всеми слоями и таймстемпами</a>
+
+<h2>🔑 Токен (JSON)</h2>
+<a href="http://localhost:8015/get_token">GET /get_token</a>
+
+<hr>
+<div class="foot">
+✅ Ноль JavaScript — чистый HTML<br>
+✅ Токен автоматически впрыскивается прокси-сервером<br>
+✅ CORS не нужен — &lt;img&gt; теги грузят картинки без ограничений<br>
+✅ Прокси добавляет Referer: nowcast.ru<br>
+<br>
+Как запустить: <code>node proxy-nowcast.js</code> затем открыть этот файл в браузере
+</div>
+
+</body>
+</html>

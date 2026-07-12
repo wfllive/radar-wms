@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Радар</title>
+<style>
+*{margin:0;padding:0}
+body,html{width:100%;height:100%;overflow:hidden;background:#000}
+#map{width:100%;height:100%}
+#bar{position:absolute;top:8px;left:8px;z-index:1;display:flex;gap:4px;flex-wrap:wrap}
+#bar select,#bar input,#bar button{padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.75);color:#fff;font-size:13px;backdrop-filter:blur(4px)}
+#bar button{cursor:pointer;font-weight:bold}
+#bar button:hover{background:rgba(255,255,255,.15)}
+#bar input{font-family:monospace;font-size:11px;width:320px}
+#st{font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(0,0,0,.75);color:#3fb950}
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.2.1/ol.css">
+</head>
+<body>
+
+<div id="bar">
+  <select id="ly">
+    <option value="bufr_phenomena">Опасные явления</option>
+    <option value="bufr_dbz1">Отражаемость 1км</option>
+    <option value="bufr_height">Высота ВГО</option>
+    <option value="bufr_zdr1">Дифф отраж 1км</option>
+    <option value="bufr_vel1">Доплер 1км</option>
+    <option value="bufr_precip">Осадки</option>
+    <option value="bufr_summ12">Сумма 12ч</option>
+    <option value="nowcast">Наукастинг</option>
+    <option value="fmi_open_composite_dbz">FMI dBZ</option>
+  </select>
+  <input id="tk" placeholder="токен (подхватится сам)">
+  <button id="go">✔ Применить</button>
+  <span id="st">загрузка токена...</span>
+</div>
+
+<div id="map"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/ol@v10.2.1/dist/ol.js"></script>
+<script>
+var token='', layer=document.getElementById('ly').value;
+var W='https://www.nowcast.ru/baltrad_wsgi';
+
+function S(t,c){document.getElementById('st').textContent=t;document.getElementById('st').style.color=c||'#3fb950'}
+
+function apply(t){
+  token=t; document.getElementById('tk').value=t; src.changed();
+  try{var j=JSON.parse(atob(t.split('.')[1]));S('✅ до '+new Date(j.exp*1000).toLocaleTimeString('ru-RU'),'#3fb950')}
+  catch(e){S('✅ ок','#3fb950')}
+}
+
+// WMS слой
+var src=new ol.source.ImageWMS({
+  url:W, params:{LAYERS:layer,FORMAT:'image/png',TRANSPARENT:'true'}, ratio:1,
+  imageLoadFunction:function(img,s){img.getImage().src=s+(token?'&token='+token:'')}
+});
+var wms=new ol.layer.Image({opacity:.65,source:src});
+
+// Карта
+new ol.Map({
+  layers:[new ol.layer.Tile({source:new ol.source.OSM()}),wms],
+  target:'map',
+  view:new ol.View({center:ol.proj.fromLonLat([37.4,55.6]),zoom:6})
+}).addControl(new ol.control.ZoomSlider());
+
+// === ТОКЕН ===
+fetch('https://www.nowcast.ru/get_token')
+  .then(function(r){return r.json()})
+  .then(function(d){
+    if(d.token){apply(d.token);S('✅ авто','#3fb950')}
+    else S('нет в ответе','#d2991d')
+  })
+  .catch(function(){
+    S('⚠ вставьте токен','#d2991d');
+    var s=localStorage.getItem('t'); if(s) apply(s);
+  });
+
+document.getElementById('go').onclick=function(){
+  var t=document.getElementById('tk').value.trim(); if(!t)return;
+  localStorage.setItem('t',t); apply(t);
+};
+
+document.getElementById('ly').onchange=function(){
+  layer=this.value; src.updateParams({LAYERS:layer});
+};
+</script>
+</body>
+</html>
