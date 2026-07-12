@@ -2,18 +2,20 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Радар</title>
 <style>
 *{margin:0;padding:0}
 body,html{width:100%;height:100%;overflow:hidden;background:#000}
 #map{width:100%;height:100%}
-#bar{position:absolute;top:8px;left:8px;z-index:1;display:flex;gap:4px;flex-wrap:wrap}
-#bar select,#bar input,#bar button{padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.75);color:#fff;font-size:13px;backdrop-filter:blur(4px)}
-#bar button{cursor:pointer;font-weight:bold}
+#bar{position:absolute;top:env(safe-area-inset-top,8px);left:8px;right:8px;z-index:1;display:flex;gap:4px;flex-wrap:wrap}
+#bar select,#bar input,#bar button{padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.8);color:#fff;font-size:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#bar button{cursor:pointer;font-weight:bold;min-width:44px}
 #bar button:hover{background:rgba(255,255,255,.15)}
-#bar input{font-family:monospace;font-size:11px;width:320px}
-#st{font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(0,0,0,.75);color:#3fb950}
+#bar input{font-family:monospace;font-size:11px;flex:1;min-width:140px}
+#st{font-size:12px;padding:5px 8px;border-radius:6px;background:rgba(0,0,0,.8);white-space:nowrap}
+.pxy{font-size:10px;padding:3px 6px;border-radius:4px;background:rgba(255,255,255,.08);color:#8b949e;cursor:pointer;border:none}
+.pxy.on{background:#3fb950;color:#000}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.2.1/ol.css">
 </head>
@@ -32,26 +34,30 @@ body,html{width:100%;height:100%;overflow:hidden;background:#000}
     <option value="fmi_open_composite_dbz">FMI dBZ</option>
   </select>
   <input id="tk" placeholder="токен (подхватится сам)">
-  <button id="go">✔ Применить</button>
-  <span id="st">загрузка токена...</span>
+  <button id="go">✔</button>
+  <button id="pxy" class="pxy">прокси</button>
+  <span id="st">загрузка...</span>
 </div>
 
 <div id="map"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/ol@v10.2.1/dist/ol.js"></script>
 <script>
-var token='', layer=document.getElementById('ly').value;
+var token='', layer=document.getElementById('ly').value, useProxy=false;
 var W='https://www.nowcast.ru/baltrad_wsgi';
+var GW=function(){return useProxy?'http://localhost:8015/baltrad_wsgi':W};
+var GT=function(){return useProxy?'http://localhost:8015/get_token':'https://www.nowcast.ru/get_token'};
 
 function S(t,c){document.getElementById('st').textContent=t;document.getElementById('st').style.color=c||'#3fb950'}
+function px(t){document.getElementById('pxy').textContent=t?'прокси ✓':'прокси';document.getElementById('pxy').className=t?'pxy on':'pxy'}
 
 function apply(t){
   token=t; document.getElementById('tk').value=t; src.changed();
   try{var j=JSON.parse(atob(t.split('.')[1]));S('✅ до '+new Date(j.exp*1000).toLocaleTimeString('ru-RU'),'#3fb950')}
-  catch(e){S('✅ ок','#3fb950')}
+  catch(e){S('✅','#3fb950')}
 }
 
-// WMS слой
+// WMS
 var src=new ol.source.ImageWMS({
   url:W, params:{LAYERS:layer,FORMAT:'image/png',TRANSPARENT:'true'}, ratio:1,
   imageLoadFunction:function(img,s){img.getImage().src=s+(token?'&token='+token:'')}
@@ -65,18 +71,35 @@ new ol.Map({
   view:new ol.View({center:ol.proj.fromLonLat([37.4,55.6]),zoom:6})
 }).addControl(new ol.control.ZoomSlider());
 
-// === ТОКЕН ===
-fetch('https://www.nowcast.ru/get_token')
-  .then(function(r){return r.json()})
-  .then(function(d){
-    if(d.token){apply(d.token);S('✅ авто','#3fb950')}
-    else S('нет в ответе','#d2991d')
-  })
-  .catch(function(){
-    S('⚠ вставьте токен','#d2991d');
-    var s=localStorage.getItem('t'); if(s) apply(s);
+// ===== ТОКЕН: прямой → прокси → localStorage =====
+function tryDirect(){
+  var u=GT(); S('запрос токена...','#888');
+  fetch(u).then(function(r){return r.json()}).then(function(d){
+    if(d.token){apply(d.token);S('✅ авто','#3fb950')}else throw new Error('no token')
+  }).catch(function(e){
+    S('⚠ прямо не сработал','#d2991d');
+    if(!useProxy) tryProxy(); else fallback();
   });
+}
 
+function tryProxy(){
+  useProxy=true; px(true);
+  S('пробую прокси...','#d2991d');
+  fetch(GT()).then(function(r){return r.json()}).then(function(d){
+    if(d.token){apply(d.token);S('✅ через прокси','#3fb950')}else throw new Error('no token')
+  }).catch(function(){
+    S('⚠ прокси тоже нет','#d2991d'); useProxy=false; px(false); fallback();
+  });
+}
+
+function fallback(){
+  var s=localStorage.getItem('t');
+  if(s){apply(s);S('📦 из памяти','#3fb950')}else S('⚠ вставьте токен','#d2991d');
+}
+
+tryDirect();
+
+// ===== КНОПКИ =====
 document.getElementById('go').onclick=function(){
   var t=document.getElementById('tk').value.trim(); if(!t)return;
   localStorage.setItem('t',t); apply(t);
@@ -84,6 +107,10 @@ document.getElementById('go').onclick=function(){
 
 document.getElementById('ly').onchange=function(){
   layer=this.value; src.updateParams({LAYERS:layer});
+};
+
+document.getElementById('pxy').onclick=function(){
+  if(useProxy){useProxy=false;px(false);S('прямой nowcast.ru','');tryDirect()}else tryProxy();
 };
 </script>
 </body>
