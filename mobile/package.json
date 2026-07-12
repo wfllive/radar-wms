@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "expo": "~57.0.4",
     "expo-status-bar": "~57.0.0",
     "react": "19.2.3",
@@ -10,11 +11,10 @@
     "react-native-webview": "^14.0.1"
   },
   "scripts": {
-    "start": "node start.js",
-    "web": "node start.js web",
-    "android": "node start.js android",
-    "ios": "node start.js ios",
-    "proxy": "node proxy.js"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
   },
   "private": true
 }
